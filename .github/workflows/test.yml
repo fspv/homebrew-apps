@@ -15,7 +15,6 @@ on:
 
 jobs:
   test-macos:
-    runs-on: macos-latest
     strategy:
       matrix:
         include:
