@@ -64,7 +64,14 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: homebrew/ubuntu22.04:latest
+      options: --user root
     steps:
+      - name: Fix permissions
+        run: |
+          chown -R $(id -u):$(id -g) $PWD
+          mkdir -p /__w/_temp
+          chmod -R 777 /__w/_temp
+
       - name: Checkout
         uses: actions/checkout@v4
 
