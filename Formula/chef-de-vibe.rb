@@ -49,9 +49,13 @@ class ChefDeVibe < Formula
   end
 
   test do
+    # Create required directories
+    (testpath/".claude/projects").mkpath
+    
     # Start the server in the background
     port = free_port
     pid = fork do
+      ENV["HOME"] = testpath.to_s
       ENV["CLAUDE_BINARY_PATH"] = "/bin/sleep"
       ENV["HTTP_LISTEN_ADDRESS"] = "0.0.0.0:#{port}"
       exec "#{bin}/chef-de-vibe"
