@@ -1,0 +1,107 @@
+name: Update Formula
+
+on:
+  repository_dispatch:
+    types: [formula-update]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to (e.g., v1.0.0)'
+        required: false
+        type: string
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest release info
+        id: release
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ -n "${{ github.event.client_payload.version }}" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            # Get the latest release tag
+            VERSION=$(curl -s https://api.github.com/repos/fspv/chef-de-vibe/releases/latest | jq -r '.tag_name')
+            if [ "$VERSION" = "null" ] || [ -z "$VERSION" ]; then
+              # Fallback to latest tag if no releases
+              VERSION=$(curl -s https://api.github.com/repos/fspv/chef-de-vibe/tags | jq -r '.[0].name')
+            fi
+          fi
+          
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Updating to version: $VERSION"
+
+      - name: Download and calculate SHA256 checksums
+        id: checksums
+        run: |
+          VERSION="${{ steps.release.outputs.VERSION }}"
+          BASE_URL="https://github.com/fspv/chef-de-vibe/releases/download/${VERSION}"
+          
+          # Download binaries and calculate checksums
+          echo "Downloading macOS Intel binary..."
+          curl -sL "${BASE_URL}/chef-de-vibe-x86_64-apple-darwin" -o chef-de-vibe-x86_64-apple-darwin
+          SHA_MACOS_INTEL=$(sha256sum chef-de-vibe-x86_64-apple-darwin | awk '{print $1}')
+          
+          echo "Downloading macOS ARM binary..."
+          curl -sL "${BASE_URL}/chef-de-vibe-aarch64-apple-darwin" -o chef-de-vibe-aarch64-apple-darwin
+          SHA_MACOS_ARM=$(sha256sum chef-de-vibe-aarch64-apple-darwin | awk '{print $1}')
+          
+          echo "Downloading Linux binary..."
+          curl -sL "${BASE_URL}/chef-de-vibe-x86_64-unknown-linux-gnu" -o chef-de-vibe-x86_64-unknown-linux-gnu
+          SHA_LINUX=$(sha256sum chef-de-vibe-x86_64-unknown-linux-gnu | awk '{print $1}')
+          
+          echo "SHA_MACOS_INTEL=$SHA_MACOS_INTEL" >> $GITHUB_OUTPUT
+          echo "SHA_MACOS_ARM=$SHA_MACOS_ARM" >> $GITHUB_OUTPUT
+          echo "SHA_LINUX=$SHA_LINUX" >> $GITHUB_OUTPUT
+          
+          # Clean up downloaded files
+          rm -f chef-de-vibe-*
+
+      - name: Update Formula
+        run: |
+          VERSION="${{ steps.release.outputs.VERSION }}"
+          SHA_MACOS_INTEL="${{ steps.checksums.outputs.SHA_MACOS_INTEL }}"
+          SHA_MACOS_ARM="${{ steps.checksums.outputs.SHA_MACOS_ARM }}"
+          SHA_LINUX="${{ steps.checksums.outputs.SHA_LINUX }}"
+          
+          # Remove 'v' prefix if present for version string
+          VERSION_NUMBER="${VERSION#v}"
+          
+          # Update the formula file
+          sed -i "s/version \".*\"/version \"$VERSION_NUMBER\"/" Formula/chef-de-vibe.rb
+          sed -i "s|download/v[^/]*/chef-de-vibe|download/$VERSION/chef-de-vibe|g" Formula/chef-de-vibe.rb
+          sed -i "s/sha256 \".*\" # Intel macOS/sha256 \"$SHA_MACOS_INTEL\" # Intel macOS/" Formula/chef-de-vibe.rb
+          sed -i "s/sha256 \".*\" # ARM macOS/sha256 \"$SHA_MACOS_ARM\" # ARM macOS/" Formula/chef-de-vibe.rb
+          sed -i "s/sha256 \".*\" # Linux/sha256 \"$SHA_LINUX\" # Linux/" Formula/chef-de-vibe.rb
+          
+          # For initial setup with placeholders
+          sed -i "s/PLACEHOLDER_SHA256_MACOS_INTEL/$SHA_MACOS_INTEL/" Formula/chef-de-vibe.rb
+          sed -i "s/PLACEHOLDER_SHA256_MACOS_ARM/$SHA_MACOS_ARM/" Formula/chef-de-vibe.rb
+          sed -i "s/PLACEHOLDER_SHA256_LINUX/$SHA_LINUX/" Formula/chef-de-vibe.rb
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update chef-de-vibe to ${{ steps.release.outputs.VERSION }}"
+          title: "Update chef-de-vibe to ${{ steps.release.outputs.VERSION }}"
+          body: |
+            This PR updates the chef-de-vibe formula to version ${{ steps.release.outputs.VERSION }}.
+            
+            ### Changes
+            - Updated version to ${{ steps.release.outputs.VERSION }}
+            - Updated SHA256 checksums for all platforms
+            
+            ### Checksums
+            - macOS Intel: ${{ steps.checksums.outputs.SHA_MACOS_INTEL }}
+            - macOS ARM: ${{ steps.checksums.outputs.SHA_MACOS_ARM }}
+            - Linux: ${{ steps.checksums.outputs.SHA_LINUX }}
+          branch: update-chef-de-vibe-${{ steps.release.outputs.VERSION }}
+          delete-branch: true

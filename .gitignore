@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.tmp
+
+# Downloaded binaries (for testing)
+chef-de-vibe-*

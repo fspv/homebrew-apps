@@ -1,0 +1,93 @@
+name: Test Formula
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'Formula/*.rb'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'Formula/*.rb'
+      - '.github/workflows/test.yml'
+  workflow_dispatch:
+
+jobs:
+  test-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - name: "macOS Intel"
+            runner: macos-13
+          - name: "macOS ARM"
+            runner: macos-14
+    name: Test on ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        run: |
+          brew update-reset
+          brew --version
+
+      - name: Add tap
+        run: |
+          mkdir -p $(brew --repo)/Library/Taps/fspv
+          ln -s $PWD $(brew --repo)/Library/Taps/fspv/homebrew-apps
+
+      - name: Test audit
+        run: |
+          brew audit --strict --online fspv/apps/chef-de-vibe || true
+
+      - name: Test installation
+        run: |
+          brew install --verbose fspv/apps/chef-de-vibe
+          brew test fspv/apps/chef-de-vibe
+
+      - name: Verify installation
+        run: |
+          which chef-de-vibe
+          which chef_de_vibe
+          chef-de-vibe --version || true
+
+  test-linux:
+    runs-on: ubuntu-latest
+    container:
+      image: homebrew/ubuntu22.04:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        run: |
+          brew update-reset
+          brew --version
+
+      - name: Add tap
+        run: |
+          mkdir -p $(brew --repo)/Library/Taps/fspv
+          ln -s $PWD $(brew --repo)/Library/Taps/fspv/homebrew-apps
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+
+      - name: Test audit
+        run: |
+          brew audit --strict --online fspv/apps/chef-de-vibe || true
+
+      - name: Test installation
+        run: |
+          brew install --verbose fspv/apps/chef-de-vibe
+          brew test fspv/apps/chef-de-vibe
+
+      - name: Verify installation
+        run: |
+          which chef-de-vibe
+          which chef_de_vibe
+          chef-de-vibe --version || true
