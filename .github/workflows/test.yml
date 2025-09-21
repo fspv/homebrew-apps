@@ -45,12 +45,19 @@ jobs:
       - name: Test installation
         run: |
           brew install --verbose fspv/apps/chef-de-vibe
+          # Test with required environment variables
+          export CLAUDE_BINARY_PATH=/bin/sleep
+          export HTTP_LISTEN_ADDRESS=0.0.0.0:8765
           brew test fspv/apps/chef-de-vibe
 
       - name: Verify installation
         run: |
           which chef-de-vibe
           which chef_de_vibe
+          # Test running with required environment variables
+          export CLAUDE_BINARY_PATH=/bin/sleep
+          export HTTP_LISTEN_ADDRESS=0.0.0.0:8766
+          timeout 5s chef-de-vibe || true
           chef-de-vibe --version || true
 
   test-linux:
@@ -83,10 +90,17 @@ jobs:
       - name: Test installation
         run: |
           brew install --verbose fspv/apps/chef-de-vibe
+          # Test with required environment variables
+          export CLAUDE_BINARY_PATH=/bin/sleep
+          export HTTP_LISTEN_ADDRESS=0.0.0.0:8765
           brew test fspv/apps/chef-de-vibe
 
       - name: Verify installation
         run: |
           which chef-de-vibe
           which chef_de_vibe
+          # Test running with required environment variables
+          export CLAUDE_BINARY_PATH=/bin/sleep
+          export HTTP_LISTEN_ADDRESS=0.0.0.0:8766
+          timeout 5s chef-de-vibe || true
           chef-de-vibe --version || true

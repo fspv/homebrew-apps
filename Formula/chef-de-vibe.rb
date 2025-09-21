@@ -52,7 +52,8 @@ class ChefDeVibe < Formula
     # Start the server in the background
     port = free_port
     pid = fork do
-      ENV["PORT"] = port.to_s
+      ENV["CLAUDE_BINARY_PATH"] = "/bin/sleep"
+      ENV["HTTP_LISTEN_ADDRESS"] = "0.0.0.0:#{port}"
       exec "#{bin}/chef-de-vibe"
     end
     sleep 5
