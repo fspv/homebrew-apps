@@ -56,8 +56,8 @@ jobs:
           SHA_MACOS_ARM=$(sha256sum chef-de-vibe-aarch64-apple-darwin | awk '{print $1}')
           
           echo "Downloading Linux binary..."
-          curl -sL "${BASE_URL}/chef-de-vibe-x86_64-unknown-linux-gnu" -o chef-de-vibe-x86_64-unknown-linux-gnu
-          SHA_LINUX=$(sha256sum chef-de-vibe-x86_64-unknown-linux-gnu | awk '{print $1}')
+          curl -sL "${BASE_URL}/chef-de-vibe-x86_64-unknown-linux-musl" -o chef-de-vibe-x86_64-unknown-linux-musl
+          SHA_LINUX=$(sha256sum chef-de-vibe-x86_64-unknown-linux-musl | awk '{print $1}')
           
           echo "SHA_MACOS_INTEL=$SHA_MACOS_INTEL" >> $GITHUB_OUTPUT
           echo "SHA_MACOS_ARM=$SHA_MACOS_ARM" >> $GITHUB_OUTPUT
@@ -76,17 +76,101 @@ jobs:
           # Remove 'v' prefix if present for version string
           VERSION_NUMBER="${VERSION#v}"
           
-          # Update the formula file
-          sed -i "s/version \".*\"/version \"$VERSION_NUMBER\"/" Formula/chef-de-vibe.rb
-          sed -i "s|download/v[^/]*/chef-de-vibe|download/$VERSION/chef-de-vibe|g" Formula/chef-de-vibe.rb
-          sed -i "s/sha256 \".*\" # Intel macOS/sha256 \"$SHA_MACOS_INTEL\" # Intel macOS/" Formula/chef-de-vibe.rb
-          sed -i "s/sha256 \".*\" # ARM macOS/sha256 \"$SHA_MACOS_ARM\" # ARM macOS/" Formula/chef-de-vibe.rb
-          sed -i "s/sha256 \".*\" # Linux/sha256 \"$SHA_LINUX\" # Linux/" Formula/chef-de-vibe.rb
+          # Read the formula file
+          FORMULA_FILE="Formula/chef-de-vibe.rb"
           
-          # For initial setup with placeholders
-          sed -i "s/PLACEHOLDER_SHA256_MACOS_INTEL/$SHA_MACOS_INTEL/" Formula/chef-de-vibe.rb
-          sed -i "s/PLACEHOLDER_SHA256_MACOS_ARM/$SHA_MACOS_ARM/" Formula/chef-de-vibe.rb
-          sed -i "s/PLACEHOLDER_SHA256_LINUX/$SHA_LINUX/" Formula/chef-de-vibe.rb
+          # Create a temporary file for the updated formula
+          cat > temp_formula.rb << 'EOF'
+class ChefDeVibe < Formula
+  desc "Chef de Vibe - A Rust application with embedded React frontend"
+  homepage "https://github.com/fspv/chef-de-vibe"
+  license "MIT"
+  
+  # Note: Version and URLs will be automatically updated by GitHub Actions
+  # when new releases are published in the chef-de-vibe repository
+  version "VERSION_PLACEHOLDER"
+
+  on_macos do
+    if Hardware::CPU.intel?
+      url "https://github.com/fspv/chef-de-vibe/releases/download/VERSION_TAG_PLACEHOLDER/chef-de-vibe-x86_64-apple-darwin"
+      sha256 "SHA_MACOS_INTEL_PLACEHOLDER"
+    else
+      url "https://github.com/fspv/chef-de-vibe/releases/download/VERSION_TAG_PLACEHOLDER/chef-de-vibe-aarch64-apple-darwin"
+      sha256 "SHA_MACOS_ARM_PLACEHOLDER"
+    end
+  end
+
+  on_linux do
+    url "https://github.com/fspv/chef-de-vibe/releases/download/VERSION_TAG_PLACEHOLDER/chef-de-vibe-x86_64-unknown-linux-musl"
+    sha256 "SHA_LINUX_PLACEHOLDER"
+  end
+
+  head do
+    url "https://github.com/fspv/chef-de-vibe.git", branch: "master"
+    
+    depends_on "rust" => :build
+    depends_on "node" => :build
+    depends_on "pkg-config" => :build
+    depends_on "openssl@3"
+  end
+
+  def install
+    if build.head?
+      # Build from source for head installs
+      cd "frontend" do
+        system "npm", "ci", "--legacy-peer-deps"
+        system "npm", "run", "build"
+      end
+      system "cargo", "install", "--locked", "--root", prefix, "--path", "."
+    else
+      # Install pre-built binary
+      bin.install Dir["chef-de-vibe*"].first => "chef-de-vibe"
+    end
+    
+    # Create convenient alias
+    bin.install_symlink bin/"chef-de-vibe" => "chef_de_vibe"
+  end
+
+  test do
+    # Create required directories
+    (testpath/".claude/projects").mkpath
+    
+    # Start the server in the background
+    port = free_port
+    pid = fork do
+      ENV["HOME"] = testpath.to_s
+      ENV["CLAUDE_BINARY_PATH"] = "/bin/sleep"
+      ENV["HTTP_LISTEN_ADDRESS"] = "0.0.0.0:#{port}"
+      exec "#{bin}/chef-de-vibe"
+    end
+    sleep 5
+
+    # Test that the server is running
+    assert_match "200", shell_output("curl -I -s -o /dev/null -w '%{http_code}' http://localhost:#{port}")
+  ensure
+    Process.kill("TERM", pid) if pid
+    Process.wait(pid) if pid
+  end
+
+  def free_port
+    require "socket"
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.addr[1]
+    server.close
+    port
+  end
+end
+EOF
+          
+          # Replace placeholders with actual values
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION_NUMBER/g" temp_formula.rb
+          sed -i "s/VERSION_TAG_PLACEHOLDER/$VERSION/g" temp_formula.rb
+          sed -i "s/SHA_MACOS_INTEL_PLACEHOLDER/$SHA_MACOS_INTEL/g" temp_formula.rb
+          sed -i "s/SHA_MACOS_ARM_PLACEHOLDER/$SHA_MACOS_ARM/g" temp_formula.rb
+          sed -i "s/SHA_LINUX_PLACEHOLDER/$SHA_LINUX/g" temp_formula.rb
+          
+          # Move the updated file to the correct location
+          mv temp_formula.rb "$FORMULA_FILE"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
