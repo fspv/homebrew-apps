@@ -5,7 +5,7 @@ class ChefDeVibe < Formula
   
   # Note: Version and URLs will be automatically updated by GitHub Actions
   # when new releases are published in the chef-de-vibe repository
-  version "0.2.1"
+  version "0.2.2"
 
   on_macos do
     if Hardware::CPU.intel?
