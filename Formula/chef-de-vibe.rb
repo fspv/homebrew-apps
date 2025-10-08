@@ -5,21 +5,21 @@ class ChefDeVibe < Formula
   
   # Note: Version and URLs will be automatically updated by GitHub Actions
   # when new releases are published in the chef-de-vibe repository
-  version "0.2.3"
+  version "0.2.6"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/fspv/chef-de-vibe/releases/download/v0.2.3/chef-de-vibe-x86_64-apple-darwin"
-      sha256 "33912bb635e36884dd504e245046f6b510b25ccd6ddd3520d8148e2d89328c4b"
+      url "https://github.com/fspv/chef-de-vibe/releases/download/v0.2.6/chef-de-vibe-x86_64-apple-darwin"
+      sha256 "840cb77aed62fa207951888b06b45c722293863287a89cc8b5c458bb694ea04e"
     else
-      url "https://github.com/fspv/chef-de-vibe/releases/download/v0.2.3/chef-de-vibe-aarch64-apple-darwin"
-      sha256 "2c5b760c5a33f07f3b68cb24a89c2e9b62aaf878b6bc2822febb9241dda12df3"
+      url "https://github.com/fspv/chef-de-vibe/releases/download/v0.2.6/chef-de-vibe-aarch64-apple-darwin"
+      sha256 "ab65886cddafc759b9435c4eef5b6bef6747f19e3447182265f5079234118720"
     end
   end
 
   on_linux do
-    url "https://github.com/fspv/chef-de-vibe/releases/download/v0.2.3/chef-de-vibe-x86_64-unknown-linux-musl"
-    sha256 "a1a40b60620ef2a9d0a31a0bc832470df5c990147a6a236843b8d281b332682b"
+    url "https://github.com/fspv/chef-de-vibe/releases/download/v0.2.6/chef-de-vibe-x86_64-unknown-linux-musl"
+    sha256 "ceaf92e6f628c3faf81f82da6ad9c743fa80a8354a2b8d9f5f7308c1abd1f73a"
   end
 
   head do
